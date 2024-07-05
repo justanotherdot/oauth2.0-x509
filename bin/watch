@@ -1,0 +1,3 @@
+#!/bin/sh -eu
+
+rg -t ts -l . | entr -r $@

@@ -1,0 +1,4 @@
+#!/bin/sh -eu
+
+yarn build
+node dist/server.js

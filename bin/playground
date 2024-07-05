@@ -1,0 +1,42 @@
+#!/bin/sh -eu
+
+#curl localhost:3000/authorize
+
+#curl localhost:3000/token
+#curl localhost:3000/userinfo
+
+BASE_URL="http://localhost:3000"
+CLIENT_ID="client123"
+CLIENT_SECRET="secret123"
+REDIRECT_URI="http://localhost:3000/callback"
+
+# Step 1: Get authorization code
+AUTH_URL="${BASE_URL}/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code"
+echo "1. Open this URL in your browser: ${AUTH_URL}"
+open "$AUTH_URL"
+echo "2. After authorization, you'll be redirected. Copy the 'code' parameter from the URL."
+echo -n "Enter the authorization code: "
+read AUTH_CODE
+
+# Step 2: Exchange authorization code for access token
+echo "\nExchanging authorization code for access token..."
+TOKEN_RESPONSE=$(curl -s -X POST "${BASE_URL}/token" \
+  -H "Content-Type: application/json" \
+  -d @- << EOF
+{
+  "grant_type": "authorization_code",
+  "code": "${AUTH_CODE}",
+  "client_id": "${CLIENT_ID}",
+  "client_secret": "${CLIENT_SECRET}",
+  "redirect_uri": "${REDIRECT_URI}"
+}
+EOF
+)
+
+ACCESS_TOKEN=$(echo $TOKEN_RESPONSE | sed 's/.*"access_token":"\([^"]*\)".*/\1/')
+echo "Access Token: ${ACCESS_TOKEN}"
+
+# Step 3: Use the access token to get user info
+echo "\nFetching user info..."
+USER_INFO=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "${BASE_URL}/userinfo")
+echo "User Info: ${USER_INFO}"

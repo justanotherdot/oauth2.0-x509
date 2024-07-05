@@ -1,0 +1,6 @@
+#!/bin/sh -eu 
+
+OUT_DIR="certs"
+
+mkdir -p "$OUT_DIR"
+openssl req -x509 -newkey rsa:4096 -keyout "$OUT_DIR/private.key" -out "$OUT_DIR/certificate.pem" -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Organization/OU=OrganizationalUnit/CN=example.com"
