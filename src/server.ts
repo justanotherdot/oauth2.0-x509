@@ -4,6 +4,9 @@ import path from 'path';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload } from 'jsonwebtoken';
+import * as jose from 'node-jose';
+
+// TODO: multiple routes here actually belong in separate servers.
 
 const app = express();
 const port = 3000;
@@ -87,6 +90,29 @@ app.get('/callback', (req, res) => {
   } else {
     res.status(400).send('No authorization code received');
   }
+});
+
+app.get('/.well-known/jwks.json', async (_req, res) => {
+  // Read your x509 public key from a file
+  const publicKeyPem = certificate;
+  const x509Cert = publicKeyPem
+    .replace(/-----BEGIN CERTIFICATE-----/, '')
+    .replace(/-----END CERTIFICATE-----/, '')
+    .replace(/\s/g, '');
+
+  // Convert PEM to JWK and add the x5c parameter with your x509 certificate.
+  const keystore = jose.JWK.createKeyStore();
+  const key = await keystore.add(publicKeyPem, 'pem', {
+    x5c: [x509Cert],
+  });
+  const jwk = key.toJSON();
+  
+  // Create the JWK Set
+  const jwks = {
+    keys: [jwk]
+  };
+
+  res.json(jwks);
 });
 
 app.listen(port, () => {
