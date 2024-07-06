@@ -14,6 +14,7 @@ const port = 3000;
 // Load certificates
 const privateKey = fs.readFileSync(path.join(__dirname, '../certs/private.key'), 'utf8');
 const certificate = fs.readFileSync(path.join(__dirname, '../certs/certificate.pem'), 'utf8');
+const kid =  crypto.createHash('sha256').update(certificate).digest('hex');
 
 // In-memory store for simplicity (use a database in production)
 const clients: { [key: string]: { secret: string, redirectUri: string } } = {
@@ -55,7 +56,8 @@ app.post('/token', express.json(), (req, res) => {
     algorithm: 'RS256',
     expiresIn: '1h',
     issuer: 'https://your-oauth-server.com',
-    subject: client_id
+    subject: client_id,
+    keyid: kid,
   });
 
   tokens[accessToken] = client_id;
@@ -67,16 +69,26 @@ app.post('/token', express.json(), (req, res) => {
   });
 });
 
-app.get('/userinfo', (req, res) => {
+app.get('/userinfo', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(401).send('No token provided');
   }
 
   const token = authHeader.split(' ')[1];
+  // WARNING: This is decoded, not verified; do not trust claims or payload
+  // details other than `kid` until `verify` has been called.
+  const tokenDecode = jwt.decode(token, { complete: true });
+  if (tokenDecode === null) {
+    return;
+  }
+
+  const jwks = await fetch('http://localhost:3000/.well-known/jwks.json').then((x) => x.json());
+  const key = jwks.keys.find((k: any) => k.kid === tokenDecode.header.kid);
+  const cert = `-----BEGIN CERTIFICATE-----\n${key.x5c[0]}\n-----END CERTIFICATE-----`;
   
   try {
-    const decoded = jwt.verify(token, certificate, { algorithms: ['RS256'] }) as JwtPayload;
+    const decoded = jwt.verify(token, cert, { algorithms: ['RS256'] }) as JwtPayload;
     res.json({ user_id: decoded.sub, client_id: decoded.client_id });
   } catch (error) {
     res.status(401).send('Invalid token');
@@ -104,6 +116,7 @@ app.get('/.well-known/jwks.json', async (_req, res) => {
   const keystore = jose.JWK.createKeyStore();
   const key = await keystore.add(publicKeyPem, 'pem', {
     x5c: [x509Cert],
+    kid,
   });
   const jwk = key.toJSON();
   
