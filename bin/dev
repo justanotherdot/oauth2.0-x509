@@ -1,4 +1,16 @@
 #!/bin/sh -eu
 
+# Tear down the whole process group.
+# Ignore SIGTERM inside the action to avoid looping.
+#
+# NOTE: We don't trap SIGHUP as the convention is 
+# for a daemon to reload config on receival.
+trap 'trap - TERM && kill -- -$$' INT TERM EXIT
+
 yarn build
-node dist/server.js
+PORT=3000 node dist/server.js &
+PORT=3002 node dist/server.js &
+
+# Keep the script up.
+# This prevents the trap action from prematurely firing.
+tail -f /dev/null
